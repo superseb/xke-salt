@@ -5,33 +5,48 @@ VAGRANTFILE_API_VERSION = "2"
 
 $master = <<SCRIPT
 service iptables stop
+chkconfig iptables off
 sed -i s/enabled=1/enabled=0/ /etc/yum/pluginconf.d/fastestmirror.conf
-rpm -Uvh http://ftp.linux.ncsu.edu/pub/epel/6/i386/epel-release-6-8.noarch.rpm
-yum install -y salt-master
-chkconfig salt-master on
+rpm -Uvh http://dl.fedoraproject.org/pub/epel/6/x86_64/epel-release-6-8.noarch.rpm
+yum install -y salt-master salt-minion --enablerepo=epel-testing
+echo "file_roots:"             >> /etc/salt/master
+echo "  base:"                 >> /etc/salt/master
+echo "    - /srv/salt/states"  >> /etc/salt/master
+echo "pillar_roots:"           >> /etc/salt/master
+echo "  base:"                 >> /etc/salt/master
+echo "    - /srv/salt/pillars" >> /etc/salt/master
+echo "custom_tags:"            >> /etc/salt/grains
+echo "  - environment: prd"    >> /etc/salt/grains
 service salt-master start
-echo "10.11.12.101   minion" >> /etc/hosts
+chkconfig salt-master on
+service salt-minion start
+chkconfig salt-minion on
 SCRIPT
 
 $minion = <<SCRIPT
 service iptables stop
+chkconfig iptables off
 sed -i s/enabled=1/enabled=0/ /etc/yum/pluginconf.d/fastestmirror.conf
-rpm -Uvh http://ftp.linux.ncsu.edu/pub/epel/6/i386/epel-release-6-8.noarch.rpm
-yum install -y salt-minion
-chkconfig salt-minion on
+rpm -Uvh http://dl.fedoraproject.org/pub/epel/6/x86_64/epel-release-6-8.noarch.rpm
+yum install -y salt-minion --enablerepo=epel-testing
+sed -i 's/\#master\:\ salt/master\:\ 10\.11\.12\.100/' /etc/salt/minion
+echo "custom_tags:"           >> /etc/salt/grains
+echo "  - environment: dev"   >> /etc/salt/grains
 service salt-minion start
-echo "10.11.12.100   salt" >> /etc/hosts
+chkconfig salt-minion on
 SCRIPT
 
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 
   config.vm.define :master do |master|
-    master.vm.box      = "centos-64-64"
+    master.vm.box      = "centos-64-x64"
     master.vm.box_url  = "http://puppet-vagrant-boxes.puppetlabs.com/centos-64-x64-vbox4210-nocm.box"
-    master.vm.hostname = "salt"
+    master.vm.hostname = "salt.localdomain"
     master.vm.network :private_network, ip: "10.11.12.100"
 
     master.vm.provision "shell", inline: $master
+    master.vm.synced_folder "states/", "/srv/salt/states"
+    master.vm.synced_folder "pillars/", "/srv/salt/pillars"
 
     master.vm.provider "virtualbox" do |v|
       v.name = "Salt Master"
@@ -41,9 +56,9 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   end
 
   config.vm.define :minion do |minion|
-    minion.vm.box      = "centos-64"
+    minion.vm.box      = "centos-64-x64"
     minion.vm.box_url  = "http://puppet-vagrant-boxes.puppetlabs.com/centos-64-x64-vbox4210-nocm.box"
-    minion.vm.hostname = "minion"
+    minion.vm.hostname = "minion.localdomain"
     minion.vm.network :private_network, ip: "10.11.12.101"
 
     minion.vm.provision "shell", inline: $minion
@@ -54,4 +69,5 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
       v.customize ["modifyvm", :id, "--memory", 512]
     end
   end
+
 end
