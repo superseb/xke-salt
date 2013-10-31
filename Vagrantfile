@@ -21,6 +21,11 @@ service salt-master start
 chkconfig salt-master on
 service salt-minion start
 chkconfig salt-minion on
+echo "salt-ssh:"             > /etc/salt/roster
+echo "  host: 10.11.12.102" >> /etc/salt/roster
+echo "  user: vagrant"      >> /etc/salt/roster
+echo "  passwd: vagrant"    >> /etc/salt/roster
+echo "  sudo: True"         >> /etc/salt/roster
 SCRIPT
 
 $minion = <<SCRIPT
@@ -65,6 +70,19 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 
     minion.vm.provider "virtualbox" do |v|
       v.name = "Salt Minion"
+      v.gui  = true
+      v.customize ["modifyvm", :id, "--memory", 512]
+    end
+  end
+
+  config.vm.define :ssh do |ssh|
+    ssh.vm.box      = "centos-64-x64"
+    ssh.vm.box_url  = "http://puppet-vagrant-boxes.puppetlabs.com/centos-64-x64-vbox4210-nocm.box"
+    ssh.vm.hostname = "ssh.localdomain"
+    ssh.vm.network :private_network, ip: "10.11.12.102"
+
+    ssh.vm.provider "virtualbox" do |v|
+      v.name = "Salt SSH"
       v.gui  = true
       v.customize ["modifyvm", :id, "--memory", 512]
     end
